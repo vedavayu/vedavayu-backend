@@ -2,6 +2,7 @@ const express = require('express');
 const connectDB = require('./config/db');
 const cors = require('cors');
 const path = require('path');
+const { error } = require('console');
 require('dotenv').config();
 
 const app = express();
@@ -89,5 +90,9 @@ app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 // Test route
 app.get('/', (req, res) => {
-  res.send('API is running...');
+  res.send({
+    activeStatus: true,
+    error: false,
+    message: 'API is running',
+  });
 });
