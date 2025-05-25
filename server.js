@@ -19,8 +19,30 @@ const app = express();
 })();
 
 // CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000', 
+  'http://localhost:5173', 
+  'https://vedavayu-vedavayus-projects.vercel.app', 
+  'https://vedavayu.vercel.app'
+];
+
+// Add environment variables for dynamic origin configuration
+if (process.env.ADDITIONAL_ORIGINS) {
+  const additionalOrigins = process.env.ADDITIONAL_ORIGINS.split(',');
+  allowedOrigins.push(...additionalOrigins);
+}
+
 const corsOptions = {
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'vedavayu-vedavayus-projects.vercel.app', 'vedavayu.vercel.app'],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy violation'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
@@ -70,11 +92,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json({ message: 'API endpoint not found' });
-});
-
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
@@ -84,15 +101,38 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-
-// Test route
+// Test route - placed BEFORE 404 handler to ensure it's reachable
 app.get('/', (req, res) => {
   res.send({
     activeStatus: true,
     error: false,
     message: 'API is running',
+  });
+});
+
+// 404 Handler - must come after all routes
+app.use((req, res) => {
+  res.status(404).json({ message: 'API endpoint not found' });
+});
+
+// Start server
+const PORT = process.env.PORT || 5000;
+const server = app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+// Graceful shutdown handlers
+['SIGINT', 'SIGTERM'].forEach(signal => {
+  process.on(signal, () => {
+    console.log(`Received ${signal}, shutting down gracefully`);
+    server.close(() => {
+      console.log('HTTP server closed');
+      // Close any other resources (database, etc.)
+      process.exit(0);
+    });
+    
+    // Force close if graceful shutdown takes too long
+    setTimeout(() => {
+      console.error('Forcing server shutdown');
+      process.exit(1);
+    }, 10000);
   });
 });
