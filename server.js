@@ -3,6 +3,7 @@ const connectDB = require('./config/db');
 const cors = require('cors');
 const path = require('path');
 const { error } = require('console');
+const corsMiddleware = require('./middleware/cors');
 require('dotenv').config();
 
 const app = express();
@@ -21,9 +22,13 @@ const app = express();
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:3000', 
-  'http://localhost:5173', 
+  'http://localhost:5173',
   'https://vedavayu-vedavayus-projects.vercel.app', 
-  'https://vedavayu.vercel.app'
+  'https://vedavayu.vercel.app',
+  // Add any domains where your frontend is hosted
+  'https://vedavayu-frontend.vercel.app',
+  'https://vedavayu-frontend-ashy.vercel.app',
+  'https://vedavayu-frontend-git-main.vercel.app'
 ];
 
 // Add environment variables for dynamic origin configuration
@@ -33,16 +38,7 @@ if (process.env.ADDITIONAL_ORIGINS) {
 }
 
 const corsOptions = {
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS policy violation'));
-    }
-  },
+  origin: '*', // Allow all origins temporarily to debug
   credentials: true,
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
@@ -52,12 +48,26 @@ const corsOptions = {
 // Middleware
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // Handle preflight requests
+app.use(corsMiddleware); // Apply our custom CORS middleware as a fallback
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files - order matters!
 app.use(express.static(path.join(__dirname, 'public'))); // Serve from public directory first
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Then check uploads directory
+
+// Special route for CORS debugging and health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Server is running', 
+    environment: process.env.NODE_ENV,
+    cors: {
+      allowedOrigins,
+      methods: corsOptions.methods
+    }
+  });
+});
 
 // Safely register routes - wrap in try/catch to identify problematic routes
 try {
